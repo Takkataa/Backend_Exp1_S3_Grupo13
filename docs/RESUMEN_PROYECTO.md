@@ -30,7 +30,7 @@ raíz         Dockerfile, docker-compose.yml, .env.example, .dockerignore, READM
 - **Autorización:** `@PreAuthorize` en **todos** los endpoints. Además de rol, el bean `authz` (`AuthorizationService`) verifica propiedad: `esUsuario(id)`, `esDuenoMascota(id)`, `esDuenoNotificacion(id)`, de modo que un CLIENTE solo accede a sus propios recursos.
 - **Registro seguro:** `/api/usuarios/registro` siempre crea `CLIENTE` (ignora el rol del body). `POST /api/usuarios/interno` (solo ADMIN) crea VETERINARIO/ADMIN.
 - **Primer admin:** `DataInitializer` (CommandLineRunner) crea un ADMIN al arrancar con `ADMIN_EMAIL`/`ADMIN_PASSWORD`; si la contraseña está vacía no crea nada.
-- **Respuestas:** 401 sin token/token inválido; 403 sin permiso. Errores de negocio (`IllegalArgumentException`) → 500 (no hay `@ControllerAdvice`).
+- **Respuestas:** 401 sin token/token inválido; 403 sin permiso. Errores de negocio (`IllegalArgumentException`) → 500 (no hay `@ControllerAdvice`). `/error` está en `permitAll`: sin eso, Spring Security 6 convertía los 403 y 500 en 401 al redirigir a `/error`.
 
 ### Matriz de permisos
 | Recurso | CLIENTE | VETERINARIO | ADMIN |

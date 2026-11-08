@@ -1,0 +1,580 @@
+{
+  "info": {
+    "name": "PetSalud - Pruebas de seguridad para el informe",
+    "description": "10 requests que cubren los criterios de la pauta: JWT, autenticación, roles y permisos, y pruebas contra CSRF, XSS y SQL Injection.\n\nUso: 1) Ajustar las variables baseUrl y adminPassword. 2) Ejecutar los requests EN ORDEN (01 al 10), uno por uno, y tomar una captura de cada uno mostrando el código de estado, el body y la pestaña Test Results.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "adminPassword",
+      "value": "CAMBIAR_POR_ADMIN_PASSWORD"
+    },
+    {
+      "key": "tokenAdmin",
+      "value": ""
+    },
+    {
+      "key": "tokenCliente",
+      "value": ""
+    },
+    {
+      "key": "tokenVet",
+      "value": ""
+    },
+    {
+      "key": "tokenAlterado",
+      "value": ""
+    },
+    {
+      "key": "emailCliente",
+      "value": ""
+    },
+    {
+      "key": "emailVet",
+      "value": ""
+    },
+    {
+      "key": "idCliente",
+      "value": ""
+    },
+    {
+      "key": "idVet",
+      "value": ""
+    },
+    {
+      "key": "sufijo",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Login ADMIN (genera JWT)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 200\", () => pm.response.to.have.status(200));",
+              "const r = pm.response.json();",
+              "pm.test(\"Devuelve token JWT (3 partes)\", () => pm.expect(r.token.split(\".\")).to.have.lengthOf(3));",
+              "pm.test(\"Tipo Bearer\", () => pm.expect(r.tipo).to.eql(\"Bearer\"));",
+              "pm.test(\"Rol ADMIN\", () => pm.expect(r.rol).to.eql(\"ROLE_ADMIN\"));",
+              "pm.collectionVariables.set(\"tokenAdmin\", r.token);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "login"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "Criterio 3 (JWT): autenticación con email y contraseña; el servidor devuelve un token JWT firmado.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"admin@petsalud.cl\",\"password\":\"{{adminPassword}}\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "02 - Login con contraseña incorrecta (401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"Mensaje genérico\", () => pm.expect(pm.response.text()).to.include(\"Credenciales invalidas\"));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "login"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "Criterio 3: credenciales inválidas son rechazadas con mensaje genérico (no revela si falló el email o la clave).",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"admin@petsalud.cl\",\"password\":\"clave_incorrecta\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "03 - Acceso sin token (401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 401\", () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/productos",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "productos"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "Criterio 2: toda ruta protegida exige autenticación; sin token se responde 401."
+      }
+    },
+    {
+      "name": "04 - Token JWT alterado (401)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const t = pm.collectionVariables.get(\"tokenAdmin\") || \"\";",
+              "const i = t.lastIndexOf(\".\") + 1;",
+              "const c = t.charAt(i) === \"A\" ? \"B\" : \"A\";",
+              "pm.collectionVariables.set(\"tokenAlterado\", t.slice(0, i) + c + t.slice(i + 1));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 401 (firma inválida)\", () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/productos",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "productos"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{tokenAlterado}}",
+              "type": "string"
+            }
+          ]
+        },
+        "description": "Criterio 3: un token con la firma modificada es rechazado (la validación de firma funciona). Ejecutar después del request 01."
+      }
+    },
+    {
+      "name": "05 - Registro de cliente: el rol enviado se ignora",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set(\"emailCliente\", \"cliente\" + Date.now() + \"@petsalud.cl\");"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 200\", () => pm.response.to.have.status(200));",
+              "const r = pm.response.json();",
+              "pm.test(\"El rol quedó CLIENTE aunque se envió ADMIN\", () => pm.expect(r.rol).to.eql(\"CLIENTE\"));",
+              "pm.test(\"La respuesta no expone la contraseña\", () => pm.expect(r).to.not.have.property(\"password\"));",
+              "pm.collectionVariables.set(\"idCliente\", r.id);",
+              "pm.sendRequest({",
+              "  url: pm.collectionVariables.get(\"baseUrl\") + \"/api/login\",",
+              "  method: \"POST\",",
+              "  header: {\"Content-Type\": \"application/json\"},",
+              "  body: {mode: \"raw\", raw: JSON.stringify({email: pm.collectionVariables.get(\"emailCliente\"), password: \"Cliente123!\"})}",
+              "}, (err, res) => { if (!err && res.code === 200) pm.collectionVariables.set(\"tokenCliente\", res.json().token); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/usuarios/registro",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "usuarios",
+            "registro"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "Criterios 2 y 4: el registro público siempre crea CLIENTE aunque se envíe rol ADMIN (evita escalada de privilegios). La contraseña se guarda con BCrypt y no aparece en la respuesta. Además deja guardado el token del cliente.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{emailCliente}}\",\"password\":\"Cliente123!\",\"nombre\":\"Ana\",\"apellido\":\"Rojas\",\"rol\":\"ADMIN\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "06 - CLIENTE intenta listar usuarios (403)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 403 (sin permiso)\", () => pm.response.to.have.status(403));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/usuarios",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "usuarios"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{tokenCliente}}",
+              "type": "string"
+            }
+          ]
+        },
+        "description": "Criterio 4: control por rol. El listado de usuarios es solo para ADMIN; un cliente autenticado recibe 403. Ejecutar después del request 05."
+      }
+    },
+    {
+      "name": "07 - ADMIN crea un veterinario (200)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set(\"emailVet\", \"vet\" + Date.now() + \"@petsalud.cl\");"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 200\", () => pm.response.to.have.status(200));",
+              "const r = pm.response.json();",
+              "pm.test(\"Rol VETERINARIO\", () => pm.expect(r.rol).to.eql(\"VETERINARIO\"));",
+              "pm.collectionVariables.set(\"idVet\", r.id);",
+              "pm.sendRequest({",
+              "  url: pm.collectionVariables.get(\"baseUrl\") + \"/api/login\",",
+              "  method: \"POST\",",
+              "  header: {\"Content-Type\": \"application/json\"},",
+              "  body: {mode: \"raw\", raw: JSON.stringify({email: pm.collectionVariables.get(\"emailVet\"), password: \"Vet12345!\"})}",
+              "}, (err, res) => { if (!err && res.code === 200) pm.collectionVariables.set(\"tokenVet\", res.json().token); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/usuarios/interno",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "usuarios",
+            "interno"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{tokenAdmin}}",
+              "type": "string"
+            }
+          ]
+        },
+        "description": "Criterios 2 y 4: solo el ADMIN puede crear cuentas de empleado. Deja guardado el token del veterinario.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{emailVet}}\",\"password\":\"Vet12345!\",\"nombre\":\"Pia\",\"apellido\":\"Mena\",\"rol\":\"VETERINARIO\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "08 - CSRF: solicitud con cookies pero sin token (401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 401: las cookies no autentican\", () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cookie",
+            "value": "JSESSIONID=sesion_robada; XSRF-TOKEN=falso"
+          },
+          {
+            "key": "Origin",
+            "value": "http://sitio-malicioso.example"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/productos",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "productos"
+          ]
+        },
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "Criterio 5 (CSRF): un ataque CSRF depende de que el navegador adjunte credenciales automáticamente (cookies). La API solo acepta el header Authorization: Bearer, por lo que una solicitud con cookies de sesión y sin token es rechazada. La API es stateless (sin sesiones) y por eso no usa tokens CSRF.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nombre\":\"Producto CSRF\",\"descripcion\":\"x\",\"precio\":1000,\"stock\":1,\"categoria\":\"Prueba\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "09 - XSS: payload de script en un producto",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set(\"sufijo\", String(Date.now()));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 200 (el veterinario puede crear productos)\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Content-Type es application/json (no text/html)\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+              "pm.test(\"Header X-Content-Type-Options: nosniff\", () => pm.expect(pm.response.headers.get(\"X-Content-Type-Options\")).to.eql(\"nosniff\"));",
+              "pm.test(\"Header Content-Security-Policy presente\", () => pm.expect(pm.response.headers.get(\"Content-Security-Policy\")).to.include(\"default-src 'none'\"));",
+              "pm.test(\"El payload se almacena como texto, sin ejecutarse\", () => pm.expect(pm.response.json().nombre).to.include(\"<script>\"));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/productos",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "productos"
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{tokenVet}}",
+              "type": "string"
+            }
+          ]
+        },
+        "description": "Criterio 5 (XSS): se envía código HTML/JavaScript en los campos. La API lo trata como texto (no lo ejecuta ni lo interpreta) y responde siempre como application/json con X-Content-Type-Options: nosniff y Content-Security-Policy restrictiva, de modo que un navegador no lo ejecutaría. Ver pestaña Headers de la respuesta. Ejecutar después del request 07. Nota: la API no sanitiza el texto; el frontend debe escaparlo al mostrarlo.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nombre\":\"<script>alert('XSS')</script> {{sufijo}}\",\"descripcion\":\"<img src=x onerror=alert(1)>\",\"precio\":1000,\"stock\":5,\"categoria\":\"Prueba\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "10 - SQL Injection en parámetro de búsqueda",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Estado 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"La inyección no devuelve datos (lista vacía)\", () => pm.expect(pm.response.json()).to.have.lengthOf(0));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/productos/categoria?categoria=' OR '1'='1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "productos",
+            "categoria"
+          ],
+          "query": [
+            {
+              "key": "categoria",
+              "value": "' OR '1'='1"
+            }
+          ]
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{tokenCliente}}",
+              "type": "string"
+            }
+          ]
+        },
+        "description": "Criterio 5 (SQL Injection): se intenta inyectar ' OR '1'='1 para obtener todos los productos. Spring Data JPA usa consultas parametrizadas, así que el valor se trata como texto literal y no coincide con ninguna categoría: devuelve lista vacía aunque existan productos (el request 09 creó uno). Ejecutar después de los requests 05 y 09."
+      }
+    }
+  ]
+}

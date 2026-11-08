@@ -47,6 +47,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Rutas públicas: registro y login. Todo lo demás exige autenticación.
                         .requestMatchers("/api/usuarios/registro", "/api/login").permitAll()
+                        // /error es la ruta interna a la que Spring redirige cuando una respuesta es 403/500.
+                        // Si no se permite, un 403 (sin permiso) se convierte en 401 y los errores pierden su código real.
+                        .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 )
                 // STATELESS: el servidor no guarda sesión; cada solicitud debe traer su token.
