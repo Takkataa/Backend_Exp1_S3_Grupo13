@@ -1,0 +1,49 @@
+# Levanta la base de datos (MySQL) y la aplicacion con un solo comando:
+#   docker compose up -d --build
+# Toda la configuracion se lee del archivo .env (copiar .env.example como .env).
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: petsalud-db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-petsalud_db}
+      MYSQL_USER: ${DB_USER:-petsalud}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD en el archivo .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Defina DB_ROOT_PASSWORD en el archivo .env}
+    ports:
+      # Solo accesible desde tu propio equipo (127.0.0.1). Puerto 3307 para no chocar con un MySQL local.
+      - "127.0.0.1:${DB_HOST_PORT:-3307}:3306"
+    volumes:
+      # Los datos sobreviven aunque se borre el contenedor
+      - petsalud-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build: .
+    container_name: petsalud-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy   # la app espera a que MySQL este listo
+    environment:
+      # Dentro de la red de Docker la base se llama "db" (nombre del servicio)
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-petsalud_db}
+      DB_USER: ${DB_USER:-petsalud}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET en el archivo .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@petsalud.cl}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+volumes:
+  petsalud-db-data:
