@@ -197,5 +197,4 @@ Dockerfile · docker-compose.yml · .env.example
 ## Más documentación
 
 - `docs/GUIA_COMPLETA.md`: despliegue en Ubuntu, respaldos, ejecución sin Docker y guía de pruebas de los 44 endpoints.
-- `docs/RESUMEN_PROYECTO.md`: resumen técnico del proyecto.
 - `docs/PRUEBAS_SEGURIDAD.md`: configuración del entorno de pruebas, permisos probados por rol y hallazgos.
