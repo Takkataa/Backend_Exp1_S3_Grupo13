@@ -3,6 +3,8 @@ package com.petsalud.backendpetsalud.controller;
 import com.petsalud.backendpetsalud.dto.LoginRequest;
 import com.petsalud.backendpetsalud.dto.LoginResponse;
 import com.petsalud.backendpetsalud.security.JwtUtil;
+import com.petsalud.backendpetsalud.security.SecurityAuditLogger;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,12 +33,16 @@ public class AuthController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    // Registra en el log los logins exitosos y fallidos (monitoreo de seguridad).
+    @Autowired
+    private SecurityAuditLogger auditoria;
+
     /**
      * POST /api/login
 Recibe email y contraseña; si son correctos devuelve un token JWT.
      */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         try {
             // Si las credenciales son inválidas, authenticate() lanza AuthenticationException.
             Authentication auth = authenticationManager.authenticate(
@@ -45,9 +51,12 @@ Recibe email y contraseña; si son correctos devuelve un token JWT.
             // Credenciales correctas: se emite el token.
             String token = jwtUtil.generateToken(user);
             String rol = user.getAuthorities().iterator().next().getAuthority();
+            auditoria.loginExitoso(user.getUsername(), httpRequest);
             return ResponseEntity.ok(new LoginResponse(token, "Bearer", user.getUsername(), rol,
                     jwtUtil.getExpirationMs()));
         } catch (AuthenticationException e) {
+            // Queda registrado (sin la contraseña) para detectar intentos de fuerza bruta.
+            auditoria.loginFallido(request.email(), httpRequest);
             // Mensaje generico: no revela si fallo el email o la contrasena
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Credenciales invalidas");
         }

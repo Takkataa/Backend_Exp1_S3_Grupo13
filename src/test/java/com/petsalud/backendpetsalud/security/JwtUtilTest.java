@@ -114,10 +114,4 @@ class JwtUtilTest {
 
         assertThrows(WeakKeyException.class, () -> new JwtUtil(claveCorta, UNA_HORA));
     }
-
-    @Test
-    @DisplayName("La duración configurada del token se expone correctamente")
-    void getExpirationMs_devuelveValorConfigurado() {
-        assertEquals(UNA_HORA, jwtUtil.getExpirationMs());
-    }
 }

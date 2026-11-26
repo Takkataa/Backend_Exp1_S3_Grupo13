@@ -13,6 +13,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandlerImpl;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -28,10 +29,13 @@ public class SecurityConfig {
 
     private final UsuarioDetailsService usuarioDetailsService;
     private final JwtUtil jwtUtil;
+    private final SecurityAuditLogger auditoria;
 
-    public SecurityConfig(UsuarioDetailsService usuarioDetailsService, JwtUtil jwtUtil) {
+    public SecurityConfig(UsuarioDetailsService usuarioDetailsService, JwtUtil jwtUtil,
+                          SecurityAuditLogger auditoria) {
         this.usuarioDetailsService = usuarioDetailsService;
         this.jwtUtil = jwtUtil;
+        this.auditoria = auditoria;
     }
 
     // Cadena de filtros de seguridad: se ejecuta en cada solicitud HTTP.
@@ -39,6 +43,9 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         // Filtro propio que lee y valida el token JWT.
         JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtUtil, usuarioDetailsService);
+        // Respuestas estándar de Spring para 401 y 403 (las mismas que se usaban antes).
+        HttpStatusEntryPoint respuesta401 = new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED);
+        AccessDeniedHandlerImpl respuesta403 = new AccessDeniedHandlerImpl();
 
         http
                 // API stateless: el token viaja en el header Authorization (no en cookies),
@@ -59,9 +66,17 @@ public class SecurityConfig {
                 // Se desactivan Basic Auth y formulario: la única vía de autenticación es el JWT.
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
-                // Sin token o token invalido -> 401 (rol insuficiente -> 403 por defecto)
+                // Sin token o token invalido -> 401; rol insuficiente -> 403.
+                // Antes de responder, cada caso queda registrado en el log (monitoreo de seguridad).
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            auditoria.noAutenticado(request);
+                            respuesta401.commence(request, response, authException);
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            auditoria.accesoDenegado(request);
+                            respuesta403.handle(request, response, accessDeniedException);
+                        })
                 )
                 // Cabeceras para mitigar XSS / clickjacking en las respuestas de la API
                 .headers(headers -> headers

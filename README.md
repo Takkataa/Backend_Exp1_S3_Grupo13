@@ -10,6 +10,8 @@ Proyecto de la asignatura Desarrollo Backend II (PBY2202), actividad "Integrando
 - Autorización por **roles** (`@PreAuthorize`) y por propiedad del recurso (un cliente solo ve lo suyo).
 - 44 endpoints: usuarios, mascotas, citas, expedientes médicos, productos, ventas, notificaciones y recompensas.
 - Ejecución con **Docker Compose** (API + MySQL).
+- **Monitoreo de seguridad**: logins fallidos, accesos denegados (403) y solicitudes sin token (401) quedan en el log.
+- **94 pruebas automáticas** (JUnit 5 + Mockito) con reporte de cobertura JaCoCo.
 
 ## Requisitos
 
@@ -42,11 +44,32 @@ Para entrar desde otro equipo usa `http://<IP-del-servidor>:8080` (IP con `hostn
 |---|---|
 | `DB_PASSWORD`, `DB_ROOT_PASSWORD` | Contraseñas de MySQL (obligatorias) |
 | `DB_NAME`, `DB_USER` | Base y usuario de MySQL (por defecto `petsalud_db`, `petsalud`) |
-| `JWT_SECRET` | Clave para firmar tokens: Base64, mínimo 32 bytes (obligatoria) |
+| `JWT_SECRET` | Clave para firmar tokens: Base64, mínimo 32 bytes. **Obligatoria: sin ella la API no arranca** (no hay clave de respaldo) |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Primer administrador, se crea solo al arrancar |
 | `APP_PORT`, `DB_HOST_PORT` | Puertos del equipo: API (8080) y MySQL (3307, solo local) |
 
 El archivo `.env` **no se sube a Git** (está en `.gitignore`); solo se sube `.env.example`.
+
+### Ejecutar sin Docker (desde el IDE o con Maven)
+
+La aplicación **no arranca si falta `JWT_SECRET`**. Si no usas Docker, defínela antes de iniciarla:
+
+```bash
+# Linux / macOS
+export JWT_SECRET="$(openssl rand -base64 64 | tr -d '\n')"
+./mvnw spring-boot:run
+```
+
+```powershell
+# Windows PowerShell (la clave queda solo para esa ventana)
+$bytes = New-Object byte[] 64
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$env:JWT_SECRET = [Convert]::ToBase64String($bytes)
+.\mvnw.cmd spring-boot:run
+```
+
+En IntelliJ IDEA o VS Code agrégala en *Run Configuration → Environment variables*. Si falta, el arranque se detiene con el mensaje
+`Falta la variable de entorno JWT_SECRET...`. Las pruebas (`mvnw test`) no la necesitan: usan su propia clave de prueba.
 
 ## Roles
 
@@ -100,14 +123,37 @@ src/test/java/com/petsalud/backendpetsalud/
 ├── security/                           Pruebas de seguridad
 │   ├── JwtUtilTest.java                Unitarias: generar/validar JWT (expirado, falsificado, alterado)
 │   ├── AuthorizationServiceTest.java   Unitarias con Mockito: "un cliente solo accede a lo suyo"
-│   ├── AutenticacionTest.java          Login y registro público
-│   └── FiltroJwtTest.java              Filtro JWT, 401, cabeceras de seguridad, sin sesión ni Basic Auth
+│   ├── AutenticacionTest.java          Login, registro público y cuentas internas
+│   ├── FiltroJwtTest.java              Filtro JWT, 401, cabeceras de seguridad, sin sesión ni Basic Auth
+│   ├── ConfiguracionJwtSecretTest.java Sin JWT_SECRET (o inválido) la aplicación no arranca
+│   └── AuditoriaSeguridadTest.java     Monitoreo: logins fallidos, 401 y 403 quedan en el log
 ├── controller/*SeguridadTest.java      Acceso por rol a Cita, ExpedienteMedico, Mascota y Venta (401 / 403 / permitido)
 └── BackendpetsaludApplicationTests     Arranque del contexto
 src/test/resources/application.properties   Configuración de pruebas (H2 y clave JWT de prueba)
 ```
 
 Detalle de la configuración, matriz de permisos probada y hallazgos: `docs/PRUEBAS_SEGURIDAD.md`.
+
+## Monitoreo de seguridad
+
+La clase `SecurityAuditLogger` registra en el log los eventos de seguridad, siempre con el prefijo `SEGURIDAD`:
+
+| Evento | Nivel | Ejemplo de línea |
+|---|---|---|
+| Login correcto | INFO | `SEGURIDAD LOGIN_EXITOSO email=carla@mail.cl ip=192.168.1.20` |
+| Login fallido | WARN | `SEGURIDAD LOGIN_FALLIDO email=carla@mail.cl ip=192.168.1.20` |
+| Sin token o token inválido (401) | WARN | `SEGURIDAD NO_AUTENTICADO GET /api/mascotas/5 ip=192.168.1.20` |
+| Sin permiso (403) | WARN | `SEGURIDAD ACCESO_DENEGADO usuario=carla@mail.cl DELETE /api/mascotas/5 ip=192.168.1.20` |
+
+- **Nunca** se registran contraseñas ni tokens.
+- Los saltos de línea que envía el cliente se reemplazan por `_`, para que nadie pueda escribir líneas falsas en el log (*log injection*).
+- Muchos `LOGIN_FALLIDO` seguidos para el mismo email o IP indican un posible ataque de fuerza bruta.
+
+```bash
+docker compose logs app | grep SEGURIDAD                 # todos los eventos
+docker compose logs app | grep LOGIN_FALLIDO             # solo logins fallidos
+docker compose logs -f app | grep --line-buffered SEGURIDAD   # en vivo
+```
 
 ## Operación
 
@@ -124,7 +170,8 @@ Los datos de MySQL viven en el volumen `petsalud-db-data`: reconstruir la API no
 
 ## Seguridad en resumen
 
-- JWT firmado (HMAC-SHA) con expiración de 1 hora; el secreto sale de la variable `JWT_SECRET`, no del código.
+- JWT firmado (HMAC-SHA) con expiración de 1 hora; el secreto sale **solo** de la variable `JWT_SECRET`: no hay clave de respaldo en el código y, si falta, la API no arranca.
+- Monitoreo: logins fallidos, 401 y 403 quedan registrados en el log (ver "Monitoreo de seguridad").
 - Filtro que valida el token en cada solicitud y carga al usuario desde la base de datos.
 - Sesiones desactivadas (stateless) y CSRF deshabilitado: el token va en el header `Authorization`, que el navegador no envía solo.
 - Consultas parametrizadas (Spring Data JPA) contra inyección SQL.

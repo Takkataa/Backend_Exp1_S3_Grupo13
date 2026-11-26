@@ -88,7 +88,7 @@ Con un MySQL propio ya instalado, basta con definir `DB_HOST`, `DB_PORT`, `DB_NA
 | `DB_ROOT_PASSWORD` | Clave root de MySQL (solo Docker) | sin valor: obligatoria |
 | `DB_HOST_PORT` | Puerto de tu equipo hacia MySQL (solo Docker) | `3307` |
 | `APP_PORT` | Puerto de tu equipo hacia la API (solo Docker) | `8080` |
-| `JWT_SECRET` | Clave de firma de tokens (Base64, ≥ 32 bytes) | clave de desarrollo; **en Docker es obligatoria** |
+| `JWT_SECRET` | Clave de firma de tokens (Base64, ≥ 32 bytes) | **sin valor por defecto: obligatoria siempre**; si falta, la API no arranca |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Primer administrador; si `ADMIN_PASSWORD` está vacío no se crea | `admin@petsalud.cl` / vacío |
 
 ---

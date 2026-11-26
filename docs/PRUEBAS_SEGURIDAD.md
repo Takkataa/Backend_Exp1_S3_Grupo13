@@ -32,10 +32,12 @@ Este documento explica cómo se configuró el entorno de pruebas, qué valida ca
 | `JwtUtilTest` | Unitaria (JUnit puro) | El token lleva el email y el rol. Se acepta para su dueño y se rechaza si está **expirado**, **firmado con otra clave**, **alterado**, **malformado** o si pertenece a otro usuario. También rechaza claves de menos de 256 bits. |
 | `AuthorizationServiceTest` | Unitaria (Mockito) | Las reglas de propiedad (`esUsuario`, `esDuenoMascota`, `esDuenoNotificacion`) con repositorios simulados. Cubre también los casos límite: sin autenticación, id nulo, usuario eliminado y mascota sin dueño. |
 | `AutenticacionTest` | Integración (MockMvc) | Login correcto e incorrecto, con el mismo mensaje para email o contraseña equivocados. El registro público siempre crea un CLIENTE, cifra la contraseña con BCrypt y nunca la devuelve. Solo un ADMIN puede crear cuentas de VETERINARIO o ADMIN. |
+| `ConfiguracionJwtSecretTest` | Contexto mínimo de Spring (`ApplicationContextRunner`) | Si `JWT_SECRET` falta o no es Base64, la aplicación **no arranca** y el error explica qué falta. Con una clave válida, arranca. `application.properties` ya no tiene clave de respaldo. |
+| `AuditoriaSeguridadTest` | Integración (MockMvc + `OutputCaptureExtension`) | Los logins fallidos, los 401 y los 403 quedan en el log con usuario, ruta e IP, **sin la contraseña**. Un email con saltos de línea no puede falsificar líneas del log. |
 | `FiltroJwtTest` | Integración (MockMvc) | Responde 401 sin token, con token falso, expirado, de un usuario eliminado o sin el prefijo `Bearer`. HTTP Basic está desactivado, no se crean sesiones ni se exige CSRF y las respuestas llevan las cabeceras CSP, X-Frame-Options y nosniff. |
 | `CitaControllerSeguridadTest`, `ExpedienteMedicoControllerSeguridadTest`, `MascotaControllerSeguridadTest`, `VentaControllerSeguridadTest` | Integración (MockMvc) | El acceso a las cuatro entidades clave del caso según el rol y la propiedad del recurso: 401, 403 o permitido. |
 
-Cada regla se prueba en las dos direcciones: quien **debe** entrar, entra, y quien **no debe**, recibe 401 o 403. En total son 87 pruebas: 43 de autenticación y JWT, 43 de acceso por rol a las entidades y 1 de arranque del contexto.
+Cada regla se prueba en las dos direcciones: quien **debe** entrar, entra, y quien **no debe**, recibe 401 o 403. En total son 94 pruebas: 42 de autenticación y JWT, 8 de las correcciones pedidas en la retroalimentación de la Sumativa 1, 43 de acceso por rol a las entidades y 1 de arranque del contexto.
 
 ## 3. Matriz de permisos
 
@@ -59,7 +61,16 @@ La matriz resume las reglas `@PreAuthorize` de cada controlador. Las pruebas cub
 | `GET /api/ventas/{id}` | 🔒 | 🔒 | ✅ | ✅ |
 | `GET /api/ventas` (todas) | 🔒 | 🔒 | 🔒 | ✅ |
 
-## 4. Hallazgos y mejoras propuestas
+## 4. Correcciones pedidas en la retroalimentación de la Sumativa 1
+
+| Observación del docente | Corrección | Prueba que lo demuestra |
+|---|---|---|
+| El secreto JWT tenía un valor de respaldo en `application.properties`. Si alguien olvidaba definir la variable, cualquiera podía fabricar tokens de ADMIN | Se eliminó el valor de respaldo (`jwt.secret=${JWT_SECRET:}`). `JwtUtil` detiene el arranque si la clave falta o no es Base64, con un mensaje que explica cómo generarla | `ConfiguracionJwtSecretTest` (4 pruebas) |
+| Faltaba monitoreo: registro de logins fallidos y 403 | Nueva clase `SecurityAuditLogger`, conectada a `AuthController` (login) y a `SecurityConfig` (401 y 403). Nunca registra contraseñas ni tokens, y limpia los saltos de línea | `AuditoriaSeguridadTest` (4 pruebas) |
+
+> La clave de respaldo antigua quedó publicada en el historial de Git, así que **no debe volver a usarse** en ningún entorno.
+
+## 5. Hallazgos y mejoras propuestas
 
 1. **Los errores de negocio no se transforman en respuestas HTTP claras.** Los servicios lanzan `IllegalArgumentException`, por ejemplo con "El email ya está registrado", pero no existe un `@RestControllerAdvice`. Por eso el cliente recibe un **500** en lugar de un **400** con un mensaje. La prueba `registro_emailDuplicado_esRechazado` deja este comportamiento documentado.
    *Mejora:* agregar un manejador global que convierta `IllegalArgumentException` en un 400 y "no encontrado" en un 404.
