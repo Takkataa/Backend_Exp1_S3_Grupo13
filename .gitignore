@@ -34,3 +34,6 @@ build/
 
 ### Secretos ###
 .env
+
+### Notas personales (no se suben) ###
+EXPLICACION_CAMBIOS.md

@@ -5,7 +5,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 /**
  * Prueba básica: verifica que el contexto de Spring arranca correctamente.
- * Requiere una base de datos MySQL accesible con los datos de application.properties.
+ * Usa la base H2 en memoria definida en src/test/resources/application.properties (no necesita MySQL).
  */
 @SpringBootTest
 class BackendpetsaludApplicationTests {

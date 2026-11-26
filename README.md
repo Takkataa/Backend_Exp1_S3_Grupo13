@@ -79,6 +79,36 @@ Rutas públicas: solo `/api/login` y `/api/usuarios/registro`. El token dura 1 h
   Ajusta las variables `baseUrl` y `adminPassword` y ejecuta los requests **en orden**.
 - Guía con los 44 endpoints: `docs/GUIA_COMPLETA.md`, sección 6.
 
+## Pruebas automáticas (JUnit 5 + Mockito + JaCoCo)
+
+Las pruebas usan una base **H2 en memoria**, así que **no necesitan MySQL ni Docker**: solo Java 17+.
+
+```bash
+./mvnw test            # Windows: mvnw.cmd test
+```
+
+| Reporte | Dónde queda |
+|---|---|
+| Resultado de cada prueba (XML/TXT) | `target/surefire-reports/` |
+| Cobertura de código (HTML) | `target/site/jacoco/index.html` (abrir en el navegador) |
+
+Organización:
+
+```
+src/test/java/com/petsalud/backendpetsalud/
+├── support/SeguridadTestBase.java      Datos de prueba (un usuario por rol) y atajos para MockMvc
+├── security/                           Pruebas de seguridad
+│   ├── JwtUtilTest.java                Unitarias: generar/validar JWT (expirado, falsificado, alterado)
+│   ├── AuthorizationServiceTest.java   Unitarias con Mockito: "un cliente solo accede a lo suyo"
+│   ├── AutenticacionTest.java          Login y registro público
+│   └── FiltroJwtTest.java              Filtro JWT, 401, cabeceras de seguridad, sin sesión ni Basic Auth
+├── controller/*SeguridadTest.java      Acceso por rol a Cita, ExpedienteMedico, Mascota y Venta (401 / 403 / permitido)
+└── BackendpetsaludApplicationTests     Arranque del contexto
+src/test/resources/application.properties   Configuración de pruebas (H2 y clave JWT de prueba)
+```
+
+Detalle de la configuración, matriz de permisos probada y hallazgos: `docs/PRUEBAS_SEGURIDAD.md`.
+
 ## Operación
 
 | Acción | Comando |
@@ -112,7 +142,8 @@ src/main/java/com/petsalud/backendpetsalud/
 ├── dto/          Objetos del login
 └── security/     SecurityConfig, JwtUtil, JwtAuthenticationFilter, UsuarioDetailsService,
                   UsuarioDetails, AuthorizationService, DataInitializer
-docs/             Guía completa, resumen técnico y colección de Postman
+src/test/          Pruebas JUnit (ver sección "Pruebas automáticas")
+docs/             Guía completa, resumen técnico, pruebas de seguridad y colección de Postman
 Dockerfile · docker-compose.yml · .env.example
 ```
 
@@ -120,3 +151,4 @@ Dockerfile · docker-compose.yml · .env.example
 
 - `docs/GUIA_COMPLETA.md`: despliegue en Ubuntu, respaldos, ejecución sin Docker y guía de pruebas de los 44 endpoints.
 - `docs/RESUMEN_PROYECTO.md`: resumen técnico del proyecto.
+- `docs/PRUEBAS_SEGURIDAD.md`: configuración del entorno de pruebas, permisos probados por rol y hallazgos.
