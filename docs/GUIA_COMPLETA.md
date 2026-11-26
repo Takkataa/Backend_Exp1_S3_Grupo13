@@ -352,7 +352,7 @@ sudo systemctl enable --now docker # Docker inicia solo al reiniciar el servidor
 **2) Obtener el proyecto y configurarlo**
 
 ```bash
-git clone <URL-de-tu-repositorio> petsalud && cd petsalud
+git clone https://github.com/Takkataa/Backend_Exp1_S3_Grupo13.git petsalud && cd petsalud
 cp .env.example .env
 chmod 600 .env                     # solo tu usuario puede leer las claves
 nano .env                          # completar claves y JWT_SECRET (openssl rand -base64 64)

@@ -3,6 +3,8 @@
 API REST de la Clínica PetSalud con seguridad basada en **Spring Security + JWT**.
 Proyecto de la asignatura Desarrollo Backend II (PBY2202), actividad "Integrando seguridad en aplicaciones Backend".
 
+**Repositorio:** https://github.com/Takkataa/Backend_Exp1_S3_Grupo13
+
 ## Qué incluye
 
 - Autenticación con **JWT** (sin sesiones): el cliente hace login y envía el token en cada solicitud.
@@ -21,7 +23,7 @@ Proyecto de la asignatura Desarrollo Backend II (PBY2202), actividad "Integrando
 ## Inicio rápido
 
 ```bash
-git clone <URL-del-repositorio> petsalud && cd petsalud
+git clone https://github.com/Takkataa/Backend_Exp1_S3_Grupo13.git petsalud && cd petsalud
 cp .env.example .env              # Windows: copy .env.example .env
 chmod 600 .env                    # solo Linux/macOS
 openssl rand -base64 64           # copia el resultado y pégalo en JWT_SECRET
